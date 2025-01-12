@@ -12,7 +12,7 @@ main() {
 
     prepare
     if [ "$target" == "32" ]; then
-        package "32" 
+        package "32"
     elif [ "$target" == "64" ]; then
         package "64"
     elif [ "$target" == "64-v3" ]; then
@@ -47,7 +47,7 @@ package() {
     fi
 
     build $bit $arch $gcc_arch
-    zip $bit $arch $x86_64_level
+    zip_dir $bit $arch $x86_64_level
     sudo rm -rf $buildroot/build$bit/mpv-*
     sudo chmod -R a+rwx $buildroot/build$bit
 }
@@ -56,7 +56,7 @@ build() {
     local bit=$1
     local arch=$2
     local gcc_arch=$3
-    
+
     if [ "$compiler" == "clang" ]; then
         clang_option=(-DCMAKE_INSTALL_PREFIX=$clang_root -DMINGW_INSTALL_PREFIX=$buildroot/build$bit/install/$arch-w64-mingw32 -DCLANG_PACKAGES_LTO=ON)
     fi
@@ -76,7 +76,7 @@ build() {
     fi
     ninja -C $buildroot/build$bit update
     ninja -C $buildroot/build$bit mpv-fullclean
-    
+
     ninja -C $buildroot/build$bit mpv
 
     if [ -n "$(find $buildroot/build$bit -maxdepth 1 -type d -name "mpv*$arch*" -print -quit)" ] ; then
@@ -85,11 +85,11 @@ build() {
         echo "Failed compiled $bit-bit. Stop"
         exit 1
     fi
-    
+
     ninja -C $buildroot/build$bit cargo-clean
 }
 
-zip() {
+zip_dir() {
     local bit=$1
     local arch=$2
     local x86_64_level=$3
@@ -102,7 +102,9 @@ zip() {
     cd $gitdir/release
     for dir in ./mpv*$arch$x86_64_level*; do
         if [ -d $dir ]; then
-            7z a -m0=lzma2 -mx=9 -ms=on $dir.7z $dir/* -x!*.7z
+            cd $dir
+            zip -r ../$dir.zip ./* -x "!*.7z"
+            cd ..
             rm -rf $dir
         fi
     done
