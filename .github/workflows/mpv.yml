@@ -2,6 +2,8 @@ name: MPV
 run-name: "${{ inputs.run_name != '' && format('{0} ({1})', inputs.run_name, inputs.compiler) || inputs.prs != '' && format('{0}[{2}] ({1})', github.workflow, inputs.compiler, inputs.prs) || format('{0} ({1})', github.workflow, inputs.compiler) }}"
 
 on: 
+  schedule:
+    - cron:  '0 12 * * *'
   workflow_dispatch:
     inputs:
       build_target:
@@ -41,7 +43,7 @@ on:
       release:
         description: "Publish a release"
         required: false
-        default: false
+        default: true
         type: boolean
       command:
         description: 'input command you want to run before build'
@@ -176,7 +178,7 @@ jobs:
         run: |
           sudo echo -e "[multilib]\nInclude = /etc/pacman.d/mirrorlist" >> /etc/pacman.conf
           sudo pacman -Syu --noconfirm
-          sudo pacman -S --noconfirm --needed git ninja cmake meson clang lld libc++ unzip ragel yasm nasm gperf rst2pdf lib32-gcc-libs lib32-glib2 python-cairo curl wget mimalloc ccache
+          sudo pacman -S --noconfirm --needed git zip unzip ninja cmake meson clang lld libc++ unzip ragel yasm nasm gperf rst2pdf lib32-gcc-libs lib32-glib2 python-cairo curl wget mimalloc ccache
           mkdir -p /home/opt/7zip
           wget -qO - https://www.7-zip.org/a/7z2409-linux-x64.tar.xz | tar -xJf - -C /home/opt/7zip 7zzs
           sudo ln -s /home/opt/7zip/7zzs /usr/bin/7z
@@ -406,13 +408,13 @@ jobs:
       - name: Collect logs
         if: ${{ always() }}
         run: |
-          sudo 7z a logs.7z $(find mpv-winbuild-cmake/build${{ matrix.bit }} -type f -iname "*-*.log" -or -wholename "*/ffbuild/config.log")
+          sudo zip -r logs.zip $(find mpv-winbuild-cmake/build${{ matrix.bit }} -type f -iname "*-*.log" -or -wholename "*/ffbuild/config.log")
       - name: upload logs
         uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: ${{ matrix.bit }}${{ matrix.lgpl == true && '-lgpl' || '' }}_logs
-          path: logs.7z
+          path: logs.zip
 
       - name: "Get artifacts' name and path"
         id: get_files
@@ -438,7 +440,7 @@ jobs:
                 break;
             }
             for (let type of types) {
-              const globber = await glob.create(`mpv-winbuild-cmake/release/${type}${lgpl}-${arch}-*.7z`);
+              const globber = await glob.create(`mpv-winbuild-cmake/release/${type}${lgpl}-${arch}-*.zip`);
               const files = await globber.glob();
               if ( files.length > 0 ) {
                 const file = files[0];
@@ -453,7 +455,7 @@ jobs:
             core.exportVariable( 'ffmpeg_name', ffmpeg_name );
             const globber = await glob.create(`./mpv-winbuild-cmake/build${{ matrix.bit }}/**/ffmpeg.exe`);
             const ffmpeg_path = (await globber.glob())[0]
-            await exec.exec(`7z a -m0=lzma2 -mx=9 -ms=on mpv-winbuild-cmake/release/${ffmpeg_name}.7z ${ffmpeg_path}`)
+            await exec.exec(`zip -r mpv-winbuild-cmake/release/${ffmpeg_name}.zip ${ffmpeg_path}`)
 
       - name: upload mpv-debug
         uses: actions/upload-artifact@v4
@@ -479,7 +481,7 @@ jobs:
         if: ${{ env.ffmpeg_name }}
         with:
           name: ${{ env.ffmpeg_name }}
-          path: mpv-winbuild-cmake/release/${{ env.ffmpeg_name }}.7z
+          path: mpv-winbuild-cmake/release/${{ env.ffmpeg_name }}.zip
 
       - name: Save clang sysroot cache
         if: ${{ inputs.compiler =='clang' && inputs.no_save_cache != true && matrix.lgpl != true }}
@@ -622,7 +624,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const globber = await glob.create(`artifacts/mpv*.7z`);
+            const globber = await glob.create(`artifacts/mpv*.zip`);
             const files = await globber.glob();
             if ( files.length == 0 ) {
               core.setFailed("Artifact does not exist!");
@@ -677,7 +679,7 @@ jobs:
               "aarch64": "for ARM64(aarch64)"
             }
             async function getTips(arch){
-              const globber = await glob.create(`artifacts/mpv-${arch}-[0-9]*.7z`);
+              const globber = await glob.create(`artifacts/mpv-${arch}-[0-9]*.zip`);
               const files = await globber.glob();
               if ( files.length > 0 ) {
                 const name = path.basename(files[0]);
@@ -696,7 +698,7 @@ jobs:
             const { basename } = require('path');
             const { createHash } = require('crypto');
             const { readFileSync,writeFileSync } = require('fs');
-            const globber = await glob.create([`artifacts/mpv*.7z`,`artifacts/ffmpeg*.7z`].join('\n'));
+            const globber = await glob.create([`artifacts/mpv*.zip`,`artifacts/ffmpeg*.zip`].join('\n'));
             const files = await globber.glob();
             if ( files.length > 0 ) {
               let sha256="";
@@ -711,7 +713,7 @@ jobs:
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "artifacts/mpv*.7z,artifacts/ffmpeg*.7z,sha256.txt"
+          artifacts: "artifacts/mpv*.zip,artifacts/ffmpeg*.zip,sha256.txt"
           commit: version
           name: "${{ env.long_time }}"
           body: "${{ steps.note.outputs.note }}"
@@ -724,7 +726,7 @@ jobs:
         uses: actions/attest-build-provenance@v2
         continue-on-error: true
         with:
-          subject-path: 'artifacts/*.7z'
+          subject-path: 'artifacts/*.zip'
       - name: Prune old releases
         shell: bash
         env:
