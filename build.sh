@@ -102,7 +102,9 @@ zip_dir() {
     cd $gitdir/release
     for dir in ./mpv*$arch$x86_64_level*; do
         if [ -d $dir ]; then
-            zip -r $dir.zip $dir/* -x "!*.7z"
+            cd $dir
+            zip -r ../$dir.zip ./* -x "!*.7z"
+            cd ..
             rm -rf $dir
         fi
     done
