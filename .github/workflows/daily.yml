@@ -12,5 +12,5 @@ jobs:
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.MPV_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
-            -d '{"ref":"main","inputs":{"build_target":"64bit-v3","compiler":"clang","needclean":false,"release":"true"}}' \
+            -d '{"ref":"main","inputs":{"build_target":"64bit","compiler":"clang","needclean":false,"release":"true"}}' \
             https://api.github.com/repos/mpv-easy/mpv-winbuild/actions/workflows/mpv.yml/dispatches
